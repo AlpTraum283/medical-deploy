@@ -1,46 +1,77 @@
 version: '2.4'
 
 services:
+  rabbitmq:
+    restart: always
+    image: rabbitmq:3.10-management
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 40s
+      retries: 5
+      timeout: 10s
+    container_name: "rabbitmq"
+    ports:
+      - 15672:15672
+      - 5672:5672
+
+
   message-analyzer:
     image: application/message-analyzer:simple
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 20s
-      timeout: 10s
-      retries: 3
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8092/actuator/health"]
+#      interval: 20s
+#      timeout: 10s
+#      retries: 3
     environment:
-      SERVER_PORT: 8080
+      - SPRING_RABBITMQ_HOST=rabbitmq
     ports:
       - 8092:8080
 
   medical-monitoring:
     image: application/medical-monitoring:simple
     depends_on:
-      message-analyzer:
+      rabbitmq:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 20s
-      timeout: 10s
-      retries: 3
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+#      interval: 20s
+#      timeout: 10s
+#      retries: 3
     environment:
-      SERVER_PORT: 8080
+      - SPRING_RABBITMQ_HOST=rabbitmq
     ports:
       - 8093:8080
 
   person-service:
     image: application/person-service:simple
     depends_on:
-      message-analyzer:
-        condition: service_healthy
-      medical-monitoring:
+      rabbitmq:
         condition: service_healthy
 #    healthcheck:
-#      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+#      test: [ "CMD", "curl", "-f", "http://localhost:8094/actuator/health" ]
 #      interval: 20s
 #      timeout: 10s
 #      retries: 3
     environment:
-      SERVER_PORT: 8080
+      - SPRING_RABBITMQ_HOST=rabbitmq
     ports:
-      - 8091:8080
+      - 8094:8080
+
+  consumer:
+    image: application/consumer:simple
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+#    healthcheck:
+#      test: [ "CMD", "curl", "-f", "http://localhost:8095/actuator/health" ]
+#      interval: 20s
+#      timeout: 10s
+#      retries: 3
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    ports:
+      - 8095:8080
+
